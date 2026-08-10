@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StreakPact</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header>
+  <h1>StreakPact</h1>
+  <p class="tagline">Keep the group's DSA prep streak alive.</p>
+  <button id="logout-btn" class="hidden" onclick="logout()">Log out</button>
+</header>
+
+<main>
+
+  <!-- ===== AUTH VIEW (shown when logged out) ===== -->
+  <section id="auth-view">
+    <div class="tabs">
+      <button id="tab-login" class="tab active" onclick="showTab('login')">Log in</button>
+      <button id="tab-signup" class="tab" onclick="showTab('signup')">Sign up</button>
+    </div>
+
+    <form id="login-form" class="card" onsubmit="handleLogin(event)">
+      <h2>Log in</h2>
+      <label>Username
+        <input type="text" id="login-username" required />
+      </label>
+      <label>Password
+        <input type="password" id="login-password" required />
+      </label>
+      <button type="submit">Log in</button>
+      <p class="error" id="login-error"></p>
+    </form>
+
+    <form id="signup-form" class="card hidden" onsubmit="handleSignup(event)">
+      <h2>Create your account</h2>
+      <label>Username
+        <input type="text" id="signup-username" required />
+      </label>
+      <label>Password
+        <input type="password" id="signup-password" required minlength="6" />
+      </label>
+      <label>LeetCode username
+        <input type="text" id="signup-leetcode" required placeholder="exactly as it appears on leetcode.com/u/..." />
+      </label>
+      <label>Codeforces handle <span class="optional">(optional)</span>
+        <input type="text" id="signup-codeforces" />
+      </label>
+      <p class="help">You can link Telegram notifications after signing up, from your dashboard.</p>
+      <button type="submit">Sign up</button>
+      <p class="error" id="signup-error"></p>
+    </form>
+  </section>
+
+  <!-- ===== DASHBOARD VIEW (shown when logged in) ===== -->
+  <section id="dashboard-view" class="hidden">
+
+    <div class="card" id="profile-card">
+      <h2>Your progress</h2>
+      <div id="profile-summary">Loading...</div>
+      <div id="telegram-link-section"></div>
+    </div>
+
+    <div class="card">
+      <h2>Your groups</h2>
+      <div id="groups-list">Loading...</div>
+
+      <div class="group-actions">
+        <details>
+          <summary>Create a new group</summary>
+          <form onsubmit="handleCreateGroup(event)">
+            <label>Group name
+              <input type="text" id="create-group-name" required />
+            </label>
+            <label>Telegram group chat ID <span class="optional">(optional, add later)</span>
+              <input type="text" id="create-group-chat-id" placeholder="add the bot to a group chat first" />
+            </label>
+            <button type="submit">Create group</button>
+          </form>
+          <p class="error" id="create-group-error"></p>
+        </details>
+
+        <details>
+          <summary>Join a group with an invite code</summary>
+          <form onsubmit="handleJoinGroup(event)">
+            <label>Invite code
+              <input type="text" id="join-invite-code" required />
+            </label>
+            <button type="submit">Join group</button>
+          </form>
+          <p class="error" id="join-group-error"></p>
+        </details>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Recent activity</h2>
+      <div id="history-list">Loading...</div>
+    </div>
+
+  </section>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

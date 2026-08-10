@@ -1,0 +1,48 @@
+# ==========================================
+# Environments & Virtual Envs
+# ==========================================
+.venv/
+venv/
+ENV/
+env/
+
+# ==========================================
+# Databases & Local Data
+# ==========================================
+*.db
+*.sqlite
+*.sqlite3
+streakpact.db
+
+# ==========================================
+# Environment Variables & Secrets
+# ==========================================
+.env
+.env.*
+*.pem
+*.key
+
+# ==========================================
+# Python Cache & Bytecode
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ==========================================
+# Windows / WSL Artifacts
+# ==========================================
+*:Zone.Identifier
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ==========================================
+# IDE & Editor Configurations
+# ==========================================
+.vscode/
+.idea/
+*.swp
