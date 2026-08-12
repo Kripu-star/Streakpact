@@ -107,3 +107,21 @@ def find_chat_id_from_start_payload(payload: str) -> str | None:
 
 def build_deep_link(payload: str) -> str:
     return f"https://t.me/{settings.TELEGRAM_BOT_USERNAME}?start={payload}"
+
+
+def detect_group_chats() -> list[dict]:
+    """
+    Scans recent bot updates for messages sent from group/supergroup chats, so a group
+    creator can pick their Telegram group from a list instead of manually reading raw
+    getUpdates JSON. Requires the creator to have sent at least one message in that group
+    after adding the bot.
+    Returns deduped [{'chat_id': str, 'title': str}, ...], most recent first.
+    """
+    seen = {}
+    for update in get_updates():
+        message = update.get("message", {})
+        chat = message.get("chat", {})
+        if chat.get("type") in ("group", "supergroup"):
+            chat_id = str(chat.get("id"))
+            seen[chat_id] = chat.get("title", "Untitled group")
+    return [{"chat_id": cid, "title": title} for cid, title in seen.items()]

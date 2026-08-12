@@ -193,3 +193,60 @@ button[type="submit"]:hover { background: var(--accent-hover); }
 .empty-state { color: var(--text-muted); font-size: 13px; }
 
 .hidden { display: none !important; }
+
+.members-list {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.member-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 4px 0;
+}
+.member-lc {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.member-linked { color: var(--accent); }
+.member-unlinked { color: var(--text-muted); }
+
+.password-field {
+  position: relative;
+  display: flex;
+}
+.password-field input { flex: 1; }
+.toggle-password {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+.detected-chat {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.detected-chat:hover { border-color: var(--accent); }
+
+.danger-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--danger);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.danger-btn:hover { background: var(--danger); color: #fff; }

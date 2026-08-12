@@ -35,7 +35,7 @@ class UserOut(BaseModel):
 
 class GroupCreate(BaseModel):
     name: str
-    telegram_chat_id: Optional[str] = None
+    telegram_chat_id: str
 
 
 class GroupJoin(BaseModel):
@@ -51,6 +51,7 @@ class GroupOut(BaseModel):
     name: str
     invite_code: str
     telegram_chat_id: Optional[str]
+    creator_id: Optional[str]
     created_at: datetime
 
     class Config:
@@ -82,6 +83,19 @@ class UserHistoryOut(BaseModel):
     user: UserOut
     streak: Optional[StreakOut]
     history: List[SubmissionOut]
+
+
+class GroupMemberOut(BaseModel):
+    """Used when listing a group's members to OTHER members - exposes whether Telegram is
+    linked, not the raw chat_id, since that's private to the account holder."""
+    id: str
+    username: str
+    leetcode_username: str
+    telegram_linked: bool
+    current_streak: int = 0
+
+    class Config:
+        from_attributes = True
 
 
 class GroupStreakOut(BaseModel):

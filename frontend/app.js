@@ -31,6 +31,13 @@ async function apiFetch(path, options = {}) {
 
 // ---------- Tabs ----------
 
+function togglePassword(inputId, btn) {
+  const input = document.getElementById(inputId);
+  const isHidden = input.type === "password";
+  input.type = isHidden ? "text" : "password";
+  btn.textContent = isHidden ? "Hide" : "Show";
+}
+
 function showTab(which) {
   document.getElementById("tab-login").classList.toggle("active", which === "login");
   document.getElementById("tab-signup").classList.toggle("active", which === "signup");
@@ -155,55 +162,106 @@ function renderHistory(history) {
 async function loadGroups() {
   const el = document.getElementById("groups-list");
   try {
-    const groups = await apiFetch("/users/me/groups");
+    const [groups, me] = await Promise.all([apiFetch("/users/me/groups"), apiFetch("/users/me")]);
     if (groups.length === 0) {
       el.innerHTML = `<p class="empty-state">You're not in a group yet — create one or join with an invite code below.</p>`;
       return;
     }
+
+    // Render group shells first, then fill in members async per group.
     el.innerHTML = groups
       .map((g) => {
-        const chatStatus = g.telegram_chat_id
-          ? `<div class="group-code">✓ Group Telegram chat linked</div>`
-          : `
-            <div class="group-code">No group chat linked yet</div>
-            <form onsubmit="handleSetGroupChatId(event, '${g.id}')" style="margin-top:8px;">
-              <input type="text" id="group-chat-input-${g.id}" placeholder="Telegram group chat ID" style="margin-bottom:6px;" />
-              <button type="submit">Link this group's chat</button>
-            </form>
-            <p class="error" id="group-chat-error-${g.id}"></p>
-          `;
+        const isCreator = g.creator_id === me.id;
+        const actionBtn = isCreator
+          ? `<button type="button" class="danger-btn" onclick="handleDeleteGroup('${g.id}', '${g.name}')">Delete group</button>`
+          : `<button type="button" class="danger-btn" onclick="handleLeaveGroup('${g.id}', '${g.name}')">Leave group</button>`;
         return `
       <div class="group-item">
         <div class="group-name">${g.name}</div>
         <div class="group-code">Invite code: <code onclick="copyInvite('${g.invite_code}')" title="Click to copy">${g.invite_code}</code></div>
-        ${chatStatus}
+        <div class="group-code">${g.telegram_chat_id ? "✓ Group Telegram chat linked" : "⚠ No group chat linked"}</div>
+        <div class="members-list" id="members-${g.id}">Loading members...</div>
+        <div style="margin-top:10px;">${actionBtn}</div>
       </div>`;
       })
+      .join("");
+
+    for (const g of groups) {
+      loadGroupMembers(g.id);
+    }
+  } catch (err) {
+    el.innerHTML = `<p class="error">${err.message}</p>`;
+  }
+}
+
+async function handleDeleteGroup(groupId, groupName) {
+  if (!confirm(`Delete "${groupName}"? This removes it for every member and can't be undone.`)) return;
+  try {
+    await apiFetch(`/groups/${groupId}`, { method: "DELETE" });
+    await loadGroups();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function handleLeaveGroup(groupId, groupName) {
+  if (!confirm(`Leave "${groupName}"?`)) return;
+  try {
+    await apiFetch(`/groups/${groupId}/leave`, { method: "POST" });
+    await loadGroups();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function loadGroupMembers(groupId) {
+  const el = document.getElementById(`members-${groupId}`);
+  try {
+    const members = await apiFetch(`/groups/${groupId}/members`);
+    el.innerHTML = members
+      .map(
+        (m) => `
+        <div class="member-row">
+          <span>${m.username} <span class="member-lc">(${m.leetcode_username})</span></span>
+          <span class="${m.telegram_linked ? "member-linked" : "member-unlinked"}">
+            ${m.telegram_linked ? "✓ Telegram" : "✗ Telegram"} · streak ${m.current_streak}
+          </span>
+        </div>`
+      )
+      .join("");
+  } catch (err) {
+    el.innerHTML = `<p class="error">Couldn't load members</p>`;
+  }
+}
+
+function copyInvite(code) {
+  navigator.clipboard.writeText(code);
+}
+
+async function detectGroupChats() {
+  const el = document.getElementById("detected-chats-list");
+  el.innerHTML = `<p class="empty-state">Checking recent bot activity...</p>`;
+  try {
+    const data = await apiFetch("/telegram/detected-group-chats");
+    if (data.chats.length === 0) {
+      el.innerHTML = `<p class="empty-state">No group chats found yet — add the bot to your Telegram group and send a message there, then try again.</p>`;
+      return;
+    }
+    el.innerHTML = data.chats
+      .map(
+        (c) => `
+        <div class="detected-chat" onclick="selectDetectedChat('${c.chat_id}')">
+          ${c.title} <span class="member-lc">(${c.chat_id})</span>
+        </div>`
+      )
       .join("");
   } catch (err) {
     el.innerHTML = `<p class="error">${err.message}</p>`;
   }
 }
 
-async function handleSetGroupChatId(event, groupId) {
-  event.preventDefault();
-  const input = document.getElementById(`group-chat-input-${groupId}`);
-  const errorEl = document.getElementById(`group-chat-error-${groupId}`);
-  errorEl.textContent = "";
-  try {
-    await apiFetch(`/groups/${groupId}/telegram-chat-id`, {
-      method: "PATCH",
-      body: JSON.stringify({ telegram_chat_id: input.value }),
-      headers: { "Content-Type": "application/json" },
-    });
-    await loadGroups();
-  } catch (err) {
-    errorEl.textContent = err.message;
-  }
-}
-
-function copyInvite(code) {
-  navigator.clipboard.writeText(code);
+function selectDetectedChat(chatId) {
+  document.getElementById("create-group-chat-id").value = chatId;
 }
 
 // ---------- Telegram linking ----------
@@ -212,8 +270,14 @@ async function loadTelegramLinkStatus() {
   const el = document.getElementById("telegram-link-section");
   try {
     const me = await apiFetch("/users/me");
-    if (me.telegram_chat_id) {
-      el.innerHTML = `<p class="empty-state">✓ Telegram linked — you'll get a personal daily check-in and weekly summary DM. Group digests also need the group's own chat linked (see "Your groups" below).</p>`;
+    const linked = !!me.telegram_chat_id;
+
+    document.getElementById("group-actions-locked").classList.toggle("hidden", linked);
+    document.getElementById("create-group-details").classList.toggle("hidden", !linked);
+    document.getElementById("join-group-details").classList.toggle("hidden", !linked);
+
+    if (linked) {
+      el.innerHTML = `<p class="empty-state">✓ Telegram linked — you'll get a personal daily check-in and weekly summary DM. Group digests also need the group's own chat linked (set at group creation).</p>`;
       return;
     }
     renderLinkTelegramButton(el);
@@ -258,7 +322,7 @@ async function handleCreateGroup(event) {
 
   const payload = {
     name: document.getElementById("create-group-name").value,
-    telegram_chat_id: document.getElementById("create-group-chat-id").value || null,
+    telegram_chat_id: document.getElementById("create-group-chat-id").value,
   };
 
   try {

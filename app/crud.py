@@ -25,7 +25,11 @@ def get_user(db: Session, user_id: str) -> models.User | None:
 
 
 def create_group(db: Session, payload: schemas.GroupCreate, creator_user_id: str) -> models.Group:
-    group = models.Group(name=payload.name, telegram_chat_id=payload.telegram_chat_id)
+    group = models.Group(
+        name=payload.name,
+        telegram_chat_id=payload.telegram_chat_id,
+        creator_id=creator_user_id,
+    )
     db.add(group)
     db.commit()
     db.refresh(group)
@@ -60,6 +64,17 @@ def get_group_members(db: Session, group_id: str) -> list[models.User]:
     )
 
 
+def delete_group(db: Session, group_id: str) -> bool:
+    group = db.query(models.Group).filter(models.Group.id == group_id).first()
+    if not group:
+        return False
+    db.query(models.GroupMembership).filter_by(group_id=group_id).delete()
+    db.query(models.GroupStreak).filter_by(group_id=group_id).delete()
+    db.delete(group)
+    db.commit()
+    return True
+
+
 def find_group_member_with_telegram_chat_id(
     db: Session, group_id: str, telegram_chat_id: str
 ) -> models.User | None:
@@ -74,6 +89,23 @@ def find_group_member_with_telegram_chat_id(
         )
         .first()
     )
+
+
+def get_group_members_with_status(db: Session, group_id: str) -> list[dict]:
+    """Member info for display to groupmates - deliberately excludes the raw telegram_chat_id
+    (just a linked/not-linked boolean) so members can't see each other's actual Telegram IDs."""
+    members = get_group_members(db, group_id)
+    result = []
+    for m in members:
+        result.append(
+            {
+                "username": m.username,
+                "leetcode_username": m.leetcode_username,
+                "telegram_linked": m.telegram_chat_id is not None,
+                "current_streak": m.streak.current_streak if m.streak else 0,
+            }
+        )
+    return result
 
 
 def get_user_groups(db: Session, user_id: str) -> list[models.Group]:
@@ -93,6 +125,34 @@ def set_group_telegram_chat_id(db: Session, group_id: str, chat_id: str) -> mode
     db.commit()
     db.refresh(group)
     return group
+
+
+def leave_group(db: Session, group_id: str, user_id: str) -> bool:
+    """Removes a single member's own membership. Returns True if a row was actually deleted."""
+    membership = (
+        db.query(models.GroupMembership)
+        .filter_by(group_id=group_id, user_id=user_id)
+        .first()
+    )
+    if not membership:
+        return False
+    db.delete(membership)
+    db.commit()
+    return True
+
+
+def delete_group(db: Session, group_id: str) -> bool:
+    """Deletes a group and everything that references it. SQLite doesn't enforce FK cascade
+    by default, so we clean up dependent rows explicitly rather than relying on the DB."""
+    group = db.query(models.Group).filter(models.Group.id == group_id).first()
+    if not group:
+        return False
+
+    db.query(models.GroupMembership).filter_by(group_id=group_id).delete()
+    db.query(models.GroupStreak).filter_by(group_id=group_id).delete()
+    db.delete(group)
+    db.commit()
+    return True
 
 
 def get_all_users(db: Session) -> list[models.User]:

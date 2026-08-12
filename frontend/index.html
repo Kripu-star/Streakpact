@@ -29,7 +29,10 @@
         <input type="text" id="login-username" required />
       </label>
       <label>Password
-        <input type="password" id="login-password" required />
+        <div class="password-field">
+          <input type="password" id="login-password" required />
+          <button type="button" class="toggle-password" onclick="togglePassword('login-password', this)">Show</button>
+        </div>
       </label>
       <button type="submit">Log in</button>
       <p class="error" id="login-error"></p>
@@ -41,7 +44,10 @@
         <input type="text" id="signup-username" required />
       </label>
       <label>Password
-        <input type="password" id="signup-password" required minlength="6" />
+        <div class="password-field">
+          <input type="password" id="signup-password" required minlength="6" />
+          <button type="button" class="toggle-password" onclick="togglePassword('signup-password', this)">Show</button>
+        </div>
       </label>
       <label>LeetCode username
         <input type="text" id="signup-leetcode" required placeholder="exactly as it appears on leetcode.com/u/..." />
@@ -68,22 +74,36 @@
       <h2>Your groups</h2>
       <div id="groups-list">Loading...</div>
 
-      <div class="group-actions">
-        <details>
+      <div class="group-actions" id="group-actions">
+        <p class="empty-state" id="group-actions-locked">Link your personal Telegram above before you can create or join a group.</p>
+
+        <details id="create-group-details" class="hidden">
           <summary>Create a new group</summary>
           <form onsubmit="handleCreateGroup(event)">
             <label>Group name
               <input type="text" id="create-group-name" required />
             </label>
-            <label>Telegram group chat ID <span class="optional">(optional, add later)</span>
-              <input type="text" id="create-group-chat-id" placeholder="add the bot to a group chat first" />
+            <label>Telegram group chat ID
+              <input type="text" id="create-group-chat-id" required placeholder="add the bot to a group chat first" />
             </label>
+            <button type="button" onclick="detectGroupChats()" style="margin-bottom:10px;background:none;border:1px solid var(--border);color:var(--text-muted);">
+              Detect from bot activity
+            </button>
+            <div id="detected-chats-list"></div>
+            <details class="help">
+              <summary>How do I find the group's chat ID manually?</summary>
+              <ol>
+                <li>Create a Telegram group (or use an existing one) and add your bot to it</li>
+                <li>Send any message in that group</li>
+                <li>Click "Detect from bot activity" above, or open <code>https://api.telegram.org/bot&lt;BOT_TOKEN&gt;/getUpdates</code> in a browser and find <code>"chat":&#123;"id": -100123456789&#125;</code> (group IDs are negative)</li>
+              </ol>
+            </details>
             <button type="submit">Create group</button>
           </form>
           <p class="error" id="create-group-error"></p>
         </details>
 
-        <details>
+        <details id="join-group-details" class="hidden">
           <summary>Join a group with an invite code</summary>
           <form onsubmit="handleJoinGroup(event)">
             <label>Invite code

@@ -114,6 +114,13 @@ def get_telegram_link(current_user: models.User = Depends(auth.get_current_user)
     return {"link": telegram_bot.build_deep_link(current_user.id)}
 
 
+@app.get("/telegram/detected-group-chats")
+def detected_group_chats(current_user: models.User = Depends(auth.get_current_user)):
+    """Lets a group creator pick their Telegram group chat from a list the bot has actually
+    seen, instead of manually looking up a chat ID via raw getUpdates JSON."""
+    return {"chats": telegram_bot.detect_group_chats()}
+
+
 @app.post("/users/me/link-telegram")
 def link_telegram(
     current_user: models.User = Depends(auth.get_current_user),
@@ -150,6 +157,17 @@ def create_group(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
+    if not current_user.telegram_chat_id:
+        raise HTTPException(
+            400,
+            "Link your personal Telegram before creating a group (see your dashboard)",
+        )
+    if not telegram_bot.validate_chat_id(payload.telegram_chat_id):
+        raise HTTPException(
+            400,
+            "Could not reach that Telegram group chat — make sure the bot has been added to "
+            "it and someone has sent at least one message there",
+        )
     return crud.create_group(db, payload, creator_user_id=current_user.id)
 
 
@@ -159,33 +177,55 @@ def join_group(
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
+    if not current_user.telegram_chat_id:
+        raise HTTPException(
+            400,
+            "Link your personal Telegram before joining a group (see your dashboard)",
+        )
+
     group = db.query(models.Group).filter(models.Group.invite_code == payload.invite_code).first()
     if not group:
         raise HTTPException(404, "Invalid invite code")
 
-    if current_user.telegram_chat_id:
-        dupe = crud.find_group_member_with_telegram_chat_id(db, group.id, current_user.telegram_chat_id)
-        if dupe and dupe.id != current_user.id:
-            raise HTTPException(
-                400,
-                f"'{dupe.username}' in this group is already linked to your Telegram account — "
-                "each group member should be a distinct person for the streak to mean anything",
-            )
+    if not group.telegram_chat_id:
+        raise HTTPException(
+            400,
+            "This group hasn't linked its Telegram group chat yet — ask whoever created it to "
+            "finish that first, then try joining again",
+        )
+
+    dupe = crud.find_group_member_with_telegram_chat_id(db, group.id, current_user.telegram_chat_id)
+    if dupe and dupe.id != current_user.id:
+        raise HTTPException(
+            400,
+            f"'{dupe.username}' in this group is already linked to your Telegram account — "
+            "each group member should be a distinct person for the streak to mean anything",
+        )
 
     joined = crud.join_group(db, payload.invite_code, user_id=current_user.id)
     return joined
 
 
-@app.get("/groups/{group_id}/members", response_model=list[schemas.UserOut])
+@app.get("/groups/{group_id}/members", response_model=list[schemas.GroupMemberOut])
 def group_members(
     group_id: str,
     current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db),
 ):
-    member_ids = {m.id for m in crud.get_group_members(db, group_id)}
+    members = crud.get_group_members(db, group_id)
+    member_ids = {m.id for m in members}
     if current_user.id not in member_ids:
         raise HTTPException(403, "You're not a member of this group")
-    return crud.get_group_members(db, group_id)
+    return [
+        schemas.GroupMemberOut(
+            id=m.id,
+            username=m.username,
+            leetcode_username=m.leetcode_username,
+            telegram_linked=bool(m.telegram_chat_id),
+            current_streak=m.streak.current_streak if m.streak else 0,
+        )
+        for m in members
+    ]
 
 
 @app.get("/groups/{group_id}/streak", response_model=schemas.GroupStreakOut)
@@ -217,6 +257,42 @@ def update_group_telegram_chat_id(
     if not group:
         raise HTTPException(404, "Group not found")
     return group
+
+
+@app.post("/groups/{group_id}/leave")
+def leave_group(
+    group_id: str,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    group = db.query(models.Group).filter(models.Group.id == group_id).first()
+    if not group:
+        raise HTTPException(404, "Group not found")
+    if group.creator_id == current_user.id:
+        raise HTTPException(
+            400,
+            "You created this group — delete it instead of leaving (Delete group button), "
+            "since a group can't be left ownerless",
+        )
+    removed = crud.leave_group(db, group_id, current_user.id)
+    if not removed:
+        raise HTTPException(404, "You're not a member of this group")
+    return {"status": "left"}
+
+
+@app.delete("/groups/{group_id}")
+def delete_group(
+    group_id: str,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    group = db.query(models.Group).filter(models.Group.id == group_id).first()
+    if not group:
+        raise HTTPException(404, "Group not found")
+    if group.creator_id != current_user.id:
+        raise HTTPException(403, "Only the group's creator can delete it")
+    crud.delete_group(db, group_id)
+    return {"status": "deleted"}
 
 
 # ---------- Manual trigger endpoints (useful for demoing / testing without waiting for cron) ----------
