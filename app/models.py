@@ -22,10 +22,10 @@ class User(Base):
 
     id = Column(String, primary_key=True, default=gen_id)
     username = Column(String, unique=True, nullable=False, index=True)
-    hashed_password = Column(String, nullable = False)
-    leetcode_username = Column(String, unique =True, nullable=False, index = True)
+    hashed_password = Column(String, nullable=False)
+    leetcode_username = Column(String, unique=True, nullable=False, index=True)
     codeforces_handle = Column(String, nullable=True)
-    telegram_chat_id = Column(String, nullable=True)
+    telegram_chat_id = Column(String, nullable=True)  # this user's own DM chat with the bot
     created_at = Column(DateTime, default=datetime.utcnow)
 
     memberships = relationship("GroupMembership", back_populates="user")
@@ -39,8 +39,8 @@ class Group(Base):
     id = Column(String, primary_key=True, default=gen_id)
     name = Column(String, nullable=False)
     invite_code = Column(String, unique=True, default=gen_invite_code, index=True)
-    telegram_chat_id = Column(String, nullable=True) 
-    creator_id = Column(String, ForeignKey("users.id"), nullable = True)
+    telegram_chat_id = Column(String, unique=True, nullable=True)  # group chat the bot posts to
+    creator_id = Column(String, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     memberships = relationship("GroupMembership", back_populates="group")
@@ -61,6 +61,7 @@ class GroupMembership(Base):
 
 
 class DailySubmission(Base):
+    """One row per user per day per source, storing that day's activity summary."""
     __tablename__ = "daily_submissions"
     __table_args__ = (UniqueConstraint("user_id", "activity_date", "source", name="uq_user_date_source"),)
 
@@ -81,6 +82,7 @@ class DailySubmission(Base):
 
 
 class Streak(Base):
+    """Per-user streak, recomputed after each daily pull."""
     __tablename__ = "streaks"
 
     id = Column(String, primary_key=True, default=gen_id)
@@ -93,6 +95,7 @@ class Streak(Base):
 
 
 class GroupStreak(Base):
+    """Group streak resets to 0 if ANY member misses a day."""
     __tablename__ = "group_streaks"
 
     id = Column(String, primary_key=True, default=gen_id)

@@ -115,10 +115,23 @@ def get_telegram_link(current_user: models.User = Depends(auth.get_current_user)
 
 
 @app.get("/telegram/detected-group-chats")
-def detected_group_chats(current_user: models.User = Depends(auth.get_current_user)):
+def detected_group_chats(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
     """Lets a group creator pick their Telegram group chat from a list the bot has actually
-    seen, instead of manually looking up a chat ID via raw getUpdates JSON."""
-    return {"chats": telegram_bot.detect_group_chats()}
+    seen THEM post in - not any group chat the bot has ever seen from any user - and hides
+    any chat already claimed by an existing app group, since chats must be unique per group."""
+    if not current_user.telegram_chat_id:
+        raise HTTPException(400, "Link your personal Telegram first")
+
+    candidates = telegram_bot.detect_group_chats(current_user.telegram_chat_id)
+    claimed_ids = {
+        g.telegram_chat_id
+        for g in db.query(models.Group).filter(models.Group.telegram_chat_id.isnot(None)).all()
+    }
+    available = [c for c in candidates if c["chat_id"] not in claimed_ids]
+    return {"chats": available}
 
 
 @app.post("/users/me/link-telegram")
@@ -167,6 +180,15 @@ def create_group(
             400,
             "Could not reach that Telegram group chat — make sure the bot has been added to "
             "it and someone has sent at least one message there",
+        )
+    existing = db.query(models.Group).filter(
+        models.Group.telegram_chat_id == payload.telegram_chat_id
+    ).first()
+    if existing:
+        raise HTTPException(
+            400,
+            f"That Telegram group chat is already linked to another app group ('{existing.name}') "
+            "— each Telegram group can only power one StreakPact group",
         )
     return crud.create_group(db, payload, creator_user_id=current_user.id)
 
@@ -253,6 +275,18 @@ def update_group_telegram_chat_id(
     member_ids = {m.id for m in crud.get_group_members(db, group_id)}
     if current_user.id not in member_ids:
         raise HTTPException(403, "You're not a member of this group")
+
+    existing = db.query(models.Group).filter(
+        models.Group.telegram_chat_id == payload.telegram_chat_id,
+        models.Group.id != group_id,
+    ).first()
+    if existing:
+        raise HTTPException(
+            400,
+            f"That Telegram group chat is already linked to another app group ('{existing.name}') "
+            "— each Telegram group can only power one StreakPact group",
+        )
+
     group = crud.set_group_telegram_chat_id(db, group_id, payload.telegram_chat_id)
     if not group:
         raise HTTPException(404, "Group not found")

@@ -117,11 +117,17 @@ def detect_group_chats() -> list[dict]:
     after adding the bot.
     Returns deduped [{'chat_id': str, 'title': str}, ...], most recent first.
     """
+    try:
+        requester_id_int = int(requester_telegram_id)
+    except (TypeError, ValueError):
+        return []
+ 
     seen = {}
     for update in get_updates():
         message = update.get("message", {})
         chat = message.get("chat", {})
-        if chat.get("type") in ("group", "supergroup"):
+        sender = message.get("from", {})
+        if chat.get("type") in ("group", "supergroup") and sender.get("id") == requester_id_int:
             chat_id = str(chat.get("id"))
             seen[chat_id] = chat.get("title", "Untitled group")
     return [{"chat_id": cid, "title": title} for cid, title in seen.items()]
