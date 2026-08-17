@@ -109,19 +109,22 @@ def build_deep_link(payload: str) -> str:
     return f"https://t.me/{settings.TELEGRAM_BOT_USERNAME}?start={payload}"
 
 
-def detect_group_chats() -> list[dict]:
+def detect_group_chats(requester_telegram_id: str) -> list[dict]:
     """
-    Scans recent bot updates for messages sent from group/supergroup chats, so a group
-    creator can pick their Telegram group from a list instead of manually reading raw
-    getUpdates JSON. Requires the creator to have sent at least one message in that group
-    after adding the bot.
-    Returns deduped [{'chat_id': str, 'title': str}, ...], most recent first.
+    Scans recent bot updates for group/supergroup messages sent BY the requesting person
+    specifically (not just any group the bot has ever seen), so one user never sees another
+    user's groups in their detection list.
+
+    This works because in Telegram, a private chat's chat_id is the same number as that
+    person's own user_id - which is exactly what we stored as their telegram_chat_id during
+    personal linking. So filtering group messages by message.from.id == requester_telegram_id
+    correctly scopes results to "groups this specific person has messaged in."
     """
     try:
         requester_id_int = int(requester_telegram_id)
     except (TypeError, ValueError):
         return []
- 
+
     seen = {}
     for update in get_updates():
         message = update.get("message", {})
