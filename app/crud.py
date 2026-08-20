@@ -155,6 +155,46 @@ def delete_group(db: Session, group_id: str) -> bool:
     return True
 
 
+def delete_user_account(db: Session, user_id: str) -> None:
+    """Fully removes a user and everything that references them. Caller is responsible for
+    having already checked that the user isn't the creator of any group with other members
+    (see main.py) - this function assumes that check already passed."""
+    db.query(models.DailySubmission).filter_by(user_id=user_id).delete()
+    db.query(models.Streak).filter_by(user_id=user_id).delete()
+
+    # Any group this user created must, by this point, have no other members (checked by
+    # caller) - so delete those groups outright rather than leaving them ownerless.
+    owned_groups = db.query(models.Group).filter_by(creator_id=user_id).all()
+    for group in owned_groups:
+        db.query(models.GroupMembership).filter_by(group_id=group.id).delete()
+        db.query(models.GroupStreak).filter_by(group_id=group.id).delete()
+        db.delete(group)
+
+    # Remove membership in any group this user just belongs to (didn't create).
+    db.query(models.GroupMembership).filter_by(user_id=user_id).delete()
+
+    user = db.query(models.User).filter_by(id=user_id).first()
+    if user:
+        db.delete(user)
+    db.commit()
+
+
+def get_groups_created_by(db: Session, user_id: str) -> list[models.Group]:
+    return db.query(models.Group).filter(models.Group.creator_id == user_id).all()
+
+
+def delete_user_account(db: Session, user_id: str) -> None:
+    """Permanently deletes a user and everything that only makes sense in relation to them.
+    Caller (the endpoint) must have already confirmed the user isn't the creator of any group -
+    this function does not check that, to keep the two concerns (ownership vs. deletion)
+    separately testable."""
+    db.query(models.DailySubmission).filter_by(user_id=user_id).delete()
+    db.query(models.Streak).filter_by(user_id=user_id).delete()
+    db.query(models.GroupMembership).filter_by(user_id=user_id).delete()
+    db.query(models.User).filter_by(id=user_id).delete()
+    db.commit()
+
+
 def get_all_users(db: Session) -> list[models.User]:
     return db.query(models.User).all()
 

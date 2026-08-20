@@ -121,6 +121,28 @@
       <div id="history-list">Loading...</div>
     </div>
 
+    <div class="card danger-zone">
+      <h2>Danger zone</h2>
+      <details>
+        <summary>Delete my account</summary>
+        <p class="empty-state">
+          This permanently deletes your account, streak history, and group memberships.
+          If you created a group that still has other members, delete or hand off that
+          group first — this can't be undone.
+        </p>
+        <form onsubmit="handleDeleteAccount(event)">
+          <label>Confirm your password
+            <div class="password-field">
+              <input type="password" id="delete-account-password" required />
+              <button type="button" class="toggle-password" onclick="togglePassword('delete-account-password', this)">Show</button>
+            </div>
+          </label>
+          <button type="submit" class="danger-btn" style="width:100%;">Permanently delete my account</button>
+        </form>
+        <p class="error" id="delete-account-error"></p>
+      </details>
+    </div>
+
   </section>
 
 </main>

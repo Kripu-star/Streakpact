@@ -107,6 +107,30 @@ def read_own_groups(
     return crud.get_user_groups(db, current_user.id)
 
 
+@app.delete("/users/me")
+def delete_own_account(
+    payload: schemas.AccountDeleteRequest,
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not auth.verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(401, "Incorrect password")
+
+    owned_groups = db.query(models.Group).filter_by(creator_id=current_user.id).all()
+    for group in owned_groups:
+        member_count = len(crud.get_group_members(db, group.id))
+        if member_count > 1:
+            raise HTTPException(
+                400,
+                f"You created the group '{group.name}', which still has other members — "
+                "delete that group first (or transfer it) before deleting your account, "
+                "so it isn't left without an owner",
+            )
+
+    crud.delete_user_account(db, current_user.id)
+    return {"status": "account deleted"}
+
+
 @app.get("/users/me/telegram-link")
 def get_telegram_link(current_user: models.User = Depends(auth.get_current_user)):
     if not settings.TELEGRAM_BOT_USERNAME:

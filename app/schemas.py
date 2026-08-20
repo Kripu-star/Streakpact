@@ -16,6 +16,10 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class AccountDeleteRequest(BaseModel):
+    password: str
+
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"

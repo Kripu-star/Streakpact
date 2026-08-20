@@ -115,6 +115,26 @@ function logout() {
   document.getElementById("auth-view").classList.remove("hidden");
 }
 
+async function handleDeleteAccount(event) {
+  event.preventDefault();
+  const errorEl = document.getElementById("delete-account-error");
+  errorEl.textContent = "";
+
+  const password = document.getElementById("delete-account-password").value;
+  if (!confirm("This permanently deletes your account and can't be undone. Continue?")) return;
+
+  try {
+    await apiFetch("/users/me", {
+      method: "DELETE",
+      body: JSON.stringify({ password }),
+      headers: { "Content-Type": "application/json" },
+    });
+    logout();
+  } catch (err) {
+    errorEl.textContent = err.message;
+  }
+}
+
 // ---------- Dashboard ----------
 
 async function enterDashboard() {

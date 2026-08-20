@@ -250,3 +250,12 @@ button[type="submit"]:hover { background: var(--accent-hover); }
   cursor: pointer;
 }
 .danger-btn:hover { background: var(--danger); color: #fff; }
+
+.danger-zone {
+  border-color: var(--danger);
+}
+.danger-zone summary {
+  cursor: pointer;
+  color: var(--danger);
+  font-weight: 500;
+}
